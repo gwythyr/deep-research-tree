@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { TreeNode, TreeState } from './types';
+import { supabase } from './supabase';
+import { useAuth } from './AuthContext';
 
 interface TreeContextType extends TreeState {
     addNode: (parentId: string, node: Omit<TreeNode, 'id' | 'children' | 'createdAt'>) => string;
@@ -14,24 +16,98 @@ function generateId(): string {
     return Math.random().toString(36).substring(2, 9);
 }
 
+function createInitialState(): TreeState {
+    const rootId = generateId();
+    const rootNode: TreeNode = {
+        id: rootId,
+        parentId: null,
+        userMessage: '',
+        aiResponse: 'Welcome! Ask me anything by recording your voice. I\'ll help you explore any topic in depth.',
+        summary: 'Start',
+        children: [],
+        createdAt: Date.now(),
+    };
+    return {
+        nodes: new Map([[rootId, rootNode]]),
+        rootId,
+        selectedNodeId: rootId,
+    };
+}
+
+// Convert Map to JSON-serializable object
+function serializeState(state: TreeState) {
+    return {
+        nodes: Object.fromEntries(state.nodes),
+        rootId: state.rootId,
+        selectedNodeId: state.selectedNodeId,
+    };
+}
+
+// Convert stored object back to Map-based state
+function deserializeState(data: any): TreeState {
+    return {
+        nodes: new Map(Object.entries(data.nodes)),
+        rootId: data.rootId,
+        selectedNodeId: data.selectedNodeId,
+    };
+}
+
 export function TreeProvider({ children }: { children: ReactNode }) {
-    const [state, setState] = useState<TreeState>(() => {
-        const rootId = generateId();
-        const rootNode: TreeNode = {
-            id: rootId,
-            parentId: null,
-            userMessage: '',
-            aiResponse: 'Welcome! Ask me anything by recording your voice. I\'ll help you explore any topic in depth.',
-            summary: 'Start',
-            children: [],
-            createdAt: Date.now(),
-        };
-        return {
-            nodes: new Map([[rootId, rootNode]]),
-            rootId,
-            selectedNodeId: rootId,
-        };
-    });
+    const { user } = useAuth();
+    const [state, setState] = useState<TreeState>(createInitialState);
+    const [conversationId, setConversationId] = useState<string | null>(null);
+
+    // Load from Supabase when user logs in
+    useEffect(() => {
+        if (!user) {
+            setState(createInitialState());
+            setConversationId(null);
+            return;
+        }
+
+        async function loadConversation() {
+            const { data } = await supabase
+                .from('conversations')
+                .select('*')
+                .eq('user_id', user!.id)
+                .order('updated_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (data) {
+                setState(deserializeState(data.tree_data));
+                setConversationId(data.id);
+            }
+        }
+
+        loadConversation();
+    }, [user]);
+
+    // Save to Supabase when state changes
+    useEffect(() => {
+        if (!user) return;
+
+        const saveTimeout = setTimeout(async () => {
+            const serialized = serializeState(state);
+
+            if (conversationId) {
+                await supabase
+                    .from('conversations')
+                    .update({ tree_data: serialized, updated_at: new Date().toISOString() })
+                    .eq('id', conversationId);
+            } else {
+                const { data } = await supabase
+                    .from('conversations')
+                    .insert({ user_id: user.id, tree_data: serialized })
+                    .select()
+                    .single();
+
+                if (data) setConversationId(data.id);
+            }
+        }, 1000); // Debounce saves
+
+        return () => clearTimeout(saveTimeout);
+    }, [state, user, conversationId]);
 
     const addNode = useCallback((parentId: string, nodeData: Omit<TreeNode, 'id' | 'children' | 'createdAt'>): string => {
         const id = generateId();

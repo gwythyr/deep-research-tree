@@ -1,8 +1,29 @@
 import { useState } from 'react';
+import { AuthProvider, useAuth } from './AuthContext';
 import { TreeProvider } from './TreeContext';
 import { TreeView } from './components/TreeView';
 import { ChatView } from './components/ChatView';
 import './App.css';
+
+function AuthButton() {
+  const { user, loading, signInWithGoogle, signOut } = useAuth();
+
+  if (loading) return null;
+
+  if (user) {
+    return (
+      <button className="auth-button" onClick={signOut}>
+        Sign Out
+      </button>
+    );
+  }
+
+  return (
+    <button className="auth-button" onClick={signInWithGoogle}>
+      Sign in with Google
+    </button>
+  );
+}
 
 function AppContent() {
   const [forkFromId, setForkFromId] = useState<string | undefined>();
@@ -10,8 +31,11 @@ function AppContent() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>🌳 Deep Research</h1>
-        <span className="subtitle">Voice-first Knowledge Tree</span>
+        <div>
+          <h1>🌳 Deep Research</h1>
+          <span className="subtitle">Voice-first Knowledge Tree</span>
+        </div>
+        <AuthButton />
       </header>
 
       <div className="app-content">
@@ -30,9 +54,11 @@ function AppContent() {
 
 function App() {
   return (
-    <TreeProvider>
-      <AppContent />
-    </TreeProvider>
+    <AuthProvider>
+      <TreeProvider>
+        <AppContent />
+      </TreeProvider>
+    </AuthProvider>
   );
 }
 
