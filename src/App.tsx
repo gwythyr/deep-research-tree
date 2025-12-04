@@ -4,6 +4,7 @@ import { TreeProvider } from './TreeContext';
 import { TreeView } from './components/TreeView';
 import { ChatView } from './components/ChatView';
 import { ConversationList } from './components/ConversationList';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import './App.css';
 
 function AuthButton() {
@@ -28,6 +29,7 @@ function AuthButton() {
 
 function AppContent() {
   const [forkFromId, setForkFromId] = useState<string | undefined>();
+  const [showSettings, setShowSettings] = useState(false);
 
   return (
     <div className="app">
@@ -36,8 +38,14 @@ function AppContent() {
           <h1>🌳 Deep Research</h1>
           <span className="subtitle">Voice-first Knowledge Tree</span>
         </div>
-        <AuthButton />
+        <div className="header-actions">
+          <button className="settings-btn" onClick={() => setShowSettings(true)} title="Settings">
+            ⚙️
+          </button>
+          <AuthButton />
+        </div>
       </header>
+      <ApiKeyModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       <div className="app-content">
         <aside className="tree-panel">

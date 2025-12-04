@@ -1,10 +1,22 @@
-const API_KEY = 'AIzaSyAAamqhCuORpzX5O9AIW1rRgWom-JZ00V8'; // Replace with your API key
+const STORAGE_KEY = 'gemini-api-key';
+
+export function getApiKey(): string | null {
+    return localStorage.getItem(STORAGE_KEY);
+}
+
+export function setApiKey(key: string): void {
+    localStorage.setItem(STORAGE_KEY, key);
+}
 
 const FLASH_MODEL = 'gemini-2.5-flash';
 const PRO_MODEL = 'gemini-3-pro-preview'; // Gemini 3 Pro for reasoning
 
 async function callGemini(model: string, contents: any[], systemInstruction?: string) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        throw new Error('API key not set. Please add your Gemini API key in settings.');
+    }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const body: any = { contents };
     if (systemInstruction) {
