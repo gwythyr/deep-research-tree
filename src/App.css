@@ -59,7 +59,7 @@ body {
 
 /* Tree Panel */
 .tree-panel {
-  width: 320px;
+  width: 480px;
   border-right: 1px solid var(--border);
   background: var(--bg-secondary);
   display: flex;
@@ -101,7 +101,7 @@ body {
   cursor: pointer;
   font-size: 0.875rem;
   transition: all 0.15s ease;
-  max-width: 260px;
+  max-width: 420px;
 }
 
 .tree-node:hover {
@@ -150,6 +150,10 @@ body {
   border-left: 2px solid var(--border);
   margin-left: 8px;
   padding-left: 8px;
+}
+
+.tree-children>.tree-node-container {
+  margin-left: 0;
 }
 
 /* Chat Panel */
@@ -276,6 +280,91 @@ body {
   padding: 20px 24px;
   border-top: 1px solid var(--border);
   background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.text-input-container {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.text-input {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+  line-height: 1.4;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.text-input:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+.text-input::placeholder {
+  color: var(--text-muted);
+}
+
+.send-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #5558e3;
+}
+
+.send-btn:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.input-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.input-divider::before,
+.input-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.input-divider span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Audio Recorder */

@@ -12,47 +12,35 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
     const { selectedNodeId, getPathToRoot, addNode, selectNode } = useTree();
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [textInput, setTextInput] = useState('');
 
     const activeNodeId = forkFromId || selectedNodeId;
     const path = getPathToRoot(activeNodeId);
 
-    const handleRecording = useCallback(async (audioBlob: Blob) => {
+    const processMessage = useCallback(async (userMessage: string, audioBlob?: Blob) => {
         setIsProcessing(true);
         setError(null);
 
         try {
-            // 1. Transcribe audio
-            const transcript = await transcribe(audioBlob);
+            // 1. Summarize user message for tree display
+            const summary = await summarize(userMessage);
 
-            // 2. Summarize for tree display
-            const summary = await summarize(transcript);
+            // 2. Get AI response with path context
+            const sortedHistory = path.flatMap(node => [
+                { role: 'user' as const, content: node.userMessage },
+                { role: 'model' as const, content: node.aiResponse },
+            ]).filter(msg => msg.content);
+            sortedHistory.push({ role: 'user', content: userMessage });
 
-            // 3. Add user node
-            const userNodeId = addNode(activeNodeId, {
+            const response = await reason(sortedHistory, audioBlob);
+
+            // 3. Add combined user+AI node
+            addNode(activeNodeId, {
                 parentId: activeNodeId,
-                role: 'user',
                 audioBlob,
-                transcript,
+                userMessage,
+                aiResponse: response,
                 summary: summary.slice(0, 30),
-                content: transcript,
-            });
-
-            // 4. Get AI response with path context
-            const history = path.map(node => ({
-                role: node.role === 'user' ? 'user' as const : 'model' as const,
-                content: node.content,
-            }));
-            history.push({ role: 'user', content: transcript });
-
-            const response = await reason(history, audioBlob);
-            const responseSummary = await summarize(response);
-
-            // 5. Add assistant node
-            addNode(userNodeId, {
-                parentId: userNodeId,
-                role: 'assistant',
-                summary: responseSummary.slice(0, 30),
-                content: response,
             });
 
             if (forkFromId) {
@@ -65,6 +53,32 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
         }
     }, [activeNodeId, path, addNode, forkFromId, onClearFork]);
 
+    const handleRecording = useCallback(async (audioBlob: Blob) => {
+        try {
+            // Transcribe audio first
+            const transcript = await transcribe(audioBlob);
+            await processMessage(transcript, audioBlob);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'An error occurred');
+            setIsProcessing(false);
+        }
+    }, [processMessage]);
+
+    const handleTextSubmit = useCallback(async () => {
+        const message = textInput.trim();
+        if (!message || isProcessing) return;
+
+        setTextInput('');
+        await processMessage(message);
+    }, [textInput, isProcessing, processMessage]);
+
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleTextSubmit();
+        }
+    }, [handleTextSubmit]);
+
     return (
         <div className="chat-view">
             {forkFromId && (
@@ -76,20 +90,34 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
 
             <div className="messages">
                 {path.map((node, index) => (
-                    <div key={node.id} className={`message ${node.role}`}>
-                        <div className="message-header">
-                            <span className="message-role">{node.role === 'user' ? 'You' : 'AI'}</span>
-                            {index < path.length - 1 && node.role === 'assistant' && (
-                                <button
-                                    className="fork-btn"
-                                    onClick={() => selectNode(node.id)}
-                                    title="Fork from here"
-                                >
-                                    ⑂ Fork
-                                </button>
-                            )}
-                        </div>
-                        <div className="message-content">{node.content}</div>
+                    <div key={node.id} className="conversation-turn">
+                        {/* User message */}
+                        {node.userMessage && (
+                            <div className="message user">
+                                <div className="message-header">
+                                    <span className="message-role">You</span>
+                                </div>
+                                <div className="message-content">{node.userMessage}</div>
+                            </div>
+                        )}
+                        {/* AI response */}
+                        {node.aiResponse && (
+                            <div className="message assistant">
+                                <div className="message-header">
+                                    <span className="message-role">AI</span>
+                                    {index < path.length - 1 && (
+                                        <button
+                                            className="fork-btn"
+                                            onClick={() => selectNode(node.id)}
+                                            title="Fork from here"
+                                        >
+                                            ⑂ Fork
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="message-content">{node.aiResponse}</div>
+                            </div>
+                        )}
                     </div>
                 ))}
 
@@ -103,6 +131,28 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
             {error && <div className="error">{error}</div>}
 
             <div className="input-area">
+                <div className="text-input-container">
+                    <textarea
+                        className="text-input"
+                        placeholder="Type a message..."
+                        value={textInput}
+                        onChange={(e) => setTextInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={isProcessing}
+                        rows={1}
+                    />
+                    <button
+                        className="send-btn"
+                        onClick={handleTextSubmit}
+                        disabled={isProcessing || !textInput.trim()}
+                        title="Send message"
+                    >
+                        ↑
+                    </button>
+                </div>
+                <div className="input-divider">
+                    <span>or</span>
+                </div>
                 <AudioRecorder onRecordingComplete={handleRecording} disabled={isProcessing} />
             </div>
         </div>

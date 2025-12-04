@@ -1,11 +1,13 @@
 export interface TreeNode {
   id: string;
   parentId: string | null;
-  role: 'user' | 'assistant';
+  // User's input
   audioBlob?: Blob;
-  transcript?: string;
+  userMessage: string;
+  // AI's response
+  aiResponse: string;
+  // Summary for tree display (focused on user's question)
   summary: string;
-  content: string;
   children: string[];
   createdAt: number;
 }

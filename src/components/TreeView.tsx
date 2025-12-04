@@ -16,9 +16,9 @@ export function TreeView() {
         return (
             <div key={nodeId} className="tree-node-container">
                 <div
-                    className={`tree-node ${isSelected ? 'selected' : ''} ${isOnPath ? 'on-path' : ''} ${node.role}`}
+                    className={`tree-node ${isSelected ? 'selected' : ''} ${isOnPath ? 'on-path' : ''}`}
                     onClick={() => selectNode(nodeId)}
-                    title={node.content}
+                    title={node.userMessage || node.aiResponse}
                 >
                     <span className="node-summary">{node.summary}</span>
                     {node.children.length > 0 && (

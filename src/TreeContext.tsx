@@ -20,9 +20,9 @@ export function TreeProvider({ children }: { children: ReactNode }) {
         const rootNode: TreeNode = {
             id: rootId,
             parentId: null,
-            role: 'assistant',
+            userMessage: '',
+            aiResponse: 'Welcome! Ask me anything by recording your voice. I\'ll help you explore any topic in depth.',
             summary: 'Start',
-            content: 'Welcome! Ask me anything by recording your voice. I\'ll help you explore any topic in depth.',
             children: [],
             createdAt: Date.now(),
         };
