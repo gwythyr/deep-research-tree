@@ -1,13 +1,17 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import type { TreeNode, TreeState } from './types';
+import type { TreeNode, TreeState, Conversation } from './types';
 import { supabase } from './supabase';
 import { useAuth } from './AuthContext';
 
 interface TreeContextType extends TreeState {
+    conversations: Conversation[];
+    currentConversationId: string | null;
     addNode: (parentId: string, node: Omit<TreeNode, 'id' | 'children' | 'createdAt'>) => string;
     selectNode: (nodeId: string) => void;
     getPathToRoot: (nodeId: string) => TreeNode[];
     getNode: (nodeId: string) => TreeNode | undefined;
+    createNewConversation: () => void;
+    switchConversation: (id: string) => void;
 }
 
 const TreeContext = createContext<TreeContextType | null>(null);
@@ -55,59 +59,111 @@ function deserializeState(data: any): TreeState {
 export function TreeProvider({ children }: { children: ReactNode }) {
     const { user } = useAuth();
     const [state, setState] = useState<TreeState>(createInitialState);
-    const [conversationId, setConversationId] = useState<string | null>(null);
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
-    // Load from Supabase when user logs in
+    // Load conversations when user logs in
     useEffect(() => {
         if (!user) {
             setState(createInitialState());
-            setConversationId(null);
+            setConversations([]);
+            setCurrentConversationId(null);
             return;
         }
 
-        async function loadConversation() {
+        async function loadConversations() {
             const { data } = await supabase
                 .from('conversations')
-                .select('*')
+                .select('id, title, updated_at')
                 .eq('user_id', user!.id)
-                .order('updated_at', { ascending: false })
-                .limit(1)
-                .single();
+                .order('updated_at', { ascending: false });
 
-            if (data) {
-                setState(deserializeState(data.tree_data));
-                setConversationId(data.id);
+            if (data && data.length > 0) {
+                setConversations(data.map(c => ({ id: c.id, title: c.title || 'Untitled', updatedAt: c.updated_at })));
+                // Load the most recent conversation
+                const { data: conv } = await supabase
+                    .from('conversations')
+                    .select('*')
+                    .eq('id', data[0].id)
+                    .single();
+                if (conv) {
+                    setState(deserializeState(conv.tree_data));
+                    setCurrentConversationId(conv.id);
+                }
             }
         }
 
-        loadConversation();
+        loadConversations();
     }, [user]);
 
     // Save to Supabase when state changes
     useEffect(() => {
-        if (!user) return;
+        if (!user || !currentConversationId) return;
 
         const saveTimeout = setTimeout(async () => {
             const serialized = serializeState(state);
 
-            if (conversationId) {
-                await supabase
-                    .from('conversations')
-                    .update({ tree_data: serialized, updated_at: new Date().toISOString() })
-                    .eq('id', conversationId);
-            } else {
-                const { data } = await supabase
-                    .from('conversations')
-                    .insert({ user_id: user.id, tree_data: serialized })
-                    .select()
-                    .single();
-
-                if (data) setConversationId(data.id);
+            // Generate title from first user message if needed
+            let title: string | undefined;
+            const rootNode = state.nodes.get(state.rootId);
+            if (rootNode && rootNode.children.length > 0) {
+                const firstChild = state.nodes.get(rootNode.children[0]);
+                if (firstChild?.userMessage) {
+                    title = firstChild.userMessage.slice(0, 50) + (firstChild.userMessage.length > 50 ? '...' : '');
+                }
             }
-        }, 1000); // Debounce saves
+
+            await supabase
+                .from('conversations')
+                .update({
+                    tree_data: serialized,
+                    updated_at: new Date().toISOString(),
+                    ...(title && { title })
+                })
+                .eq('id', currentConversationId);
+
+            // Update local conversations list
+            if (title) {
+                setConversations(prev => prev.map(c =>
+                    c.id === currentConversationId ? { ...c, title, updatedAt: new Date().toISOString() } : c
+                ));
+            }
+        }, 1000);
 
         return () => clearTimeout(saveTimeout);
-    }, [state, user, conversationId]);
+    }, [state, user, currentConversationId]);
+
+    const createNewConversation = useCallback(async () => {
+        if (!user) return;
+
+        const newState = createInitialState();
+        const serialized = serializeState(newState);
+
+        const { data } = await supabase
+            .from('conversations')
+            .insert({ user_id: user.id, tree_data: serialized, title: 'New Conversation' })
+            .select()
+            .single();
+
+        if (data) {
+            setState(newState);
+            setCurrentConversationId(data.id);
+            setConversations(prev => [{ id: data.id, title: 'New Conversation', updatedAt: data.updated_at }, ...prev]);
+        }
+    }, [user]);
+
+    const switchConversation = useCallback(async (id: string) => {
+        const { data } = await supabase
+            .from('conversations')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (data) {
+            setState(deserializeState(data.tree_data));
+            setCurrentConversationId(data.id);
+        }
+    }, []);
 
     const addNode = useCallback((parentId: string, nodeData: Omit<TreeNode, 'id' | 'children' | 'createdAt'>): string => {
         const id = generateId();
@@ -166,7 +222,17 @@ export function TreeProvider({ children }: { children: ReactNode }) {
     }, [state.nodes]);
 
     return (
-        <TreeContext.Provider value={{ ...state, addNode, selectNode, getPathToRoot, getNode }}>
+        <TreeContext.Provider value={{
+            ...state,
+            conversations,
+            currentConversationId,
+            addNode,
+            selectNode,
+            getPathToRoot,
+            getNode,
+            createNewConversation,
+            switchConversation
+        }}>
             {children}
         </TreeContext.Provider>
     );
@@ -179,3 +245,4 @@ export function useTree() {
     }
     return context;
 }
+

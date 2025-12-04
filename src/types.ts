@@ -17,3 +17,9 @@ export interface TreeState {
   rootId: string;
   selectedNodeId: string;
 }
+
+export interface Conversation {
+  id: string;
+  title: string;
+  updatedAt: string;
+}

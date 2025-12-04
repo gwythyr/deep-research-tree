@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { TreeProvider } from './TreeContext';
 import { TreeView } from './components/TreeView';
 import { ChatView } from './components/ChatView';
+import { ConversationList } from './components/ConversationList';
 import './App.css';
 
 function AuthButton() {
@@ -40,6 +41,7 @@ function AppContent() {
 
       <div className="app-content">
         <aside className="tree-panel">
+          <ConversationList />
           <h2>Knowledge Tree</h2>
           <TreeView />
         </aside>
