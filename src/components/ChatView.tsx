@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTree } from '../TreeContext';
 import { AudioRecorder } from './AudioRecorder';
 import { transcribe, summarize, reason } from '../gemini';
@@ -13,6 +13,17 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [textInput, setTextInput] = useState('');
+    const messagesRef = useRef<HTMLDivElement>(null);
+
+    // Scroll to the selected node's message when selectedNodeId changes
+    useEffect(() => {
+        if (selectedNodeId && messagesRef.current) {
+            const messageElement = document.getElementById(`message-${selectedNodeId}`);
+            if (messageElement) {
+                messageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    }, [selectedNodeId]);
 
     const activeNodeId = forkFromId || selectedNodeId;
     const path = getPathToRoot(activeNodeId);
@@ -88,9 +99,9 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
                 </div>
             )}
 
-            <div className="messages">
+            <div className="messages" ref={messagesRef}>
                 {path.map((node, index) => (
-                    <div key={node.id} className="conversation-turn">
+                    <div key={node.id} id={`message-${node.id}`} className="conversation-turn">
                         {/* User message */}
                         {node.userMessage && (
                             <div className="message user">
