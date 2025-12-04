@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useTree } from '../TreeContext';
 import { AudioRecorder } from './AudioRecorder';
 import { transcribe, summarize, reason } from '../gemini';
@@ -126,7 +127,9 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
                                         </button>
                                     )}
                                 </div>
-                                <div className="message-content">{node.aiResponse}</div>
+                                <div className="message-content">
+                                    <ReactMarkdown>{node.aiResponse}</ReactMarkdown>
+                                </div>
                             </div>
                         )}
                     </div>
