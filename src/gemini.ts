@@ -83,7 +83,7 @@ export async function reason(
     return callGemini(
         PRO_MODEL,
         contents,
-        'You are a helpful research assistant. Provide clear, informative responses. When explaining complex topics, break them into distinct parts that could be explored further.'
+        'You are a helpful research assistant. Provide clear, informative responses. Do not suggest follow-up questions or topics to explore. Just answer what was asked.'
     );
 }
 
