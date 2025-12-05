@@ -21,21 +21,12 @@ function generateId(): string {
     return Math.random().toString(36).substring(2, 9);
 }
 
-function createInitialState(): TreeState {
-    const rootId = generateId();
-    const rootNode: TreeNode = {
-        id: rootId,
-        parentId: null,
-        userMessage: '',
-        aiResponse: 'Welcome! Ask me anything by recording your voice. I\'ll help you explore any topic in depth.',
-        summary: 'Start',
-        children: [],
-        createdAt: Date.now(),
-    };
+function createEmptyState(): TreeState {
+    // Empty state - no root node yet, will be created with first message
     return {
-        nodes: new Map([[rootId, rootNode]]),
-        rootId,
-        selectedNodeId: rootId,
+        nodes: new Map(),
+        rootId: '',
+        selectedNodeId: '',
     };
 }
 
@@ -59,14 +50,14 @@ function deserializeState(data: any): TreeState {
 
 export function TreeProvider({ children }: { children: ReactNode }) {
     const { user } = useAuth();
-    const [state, setState] = useState<TreeState>(createInitialState);
+    const [state, setState] = useState<TreeState>(createEmptyState);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
     // Load conversations when user logs in
     useEffect(() => {
         if (!user) {
-            setState(createInitialState());
+            setState(createEmptyState());
             setConversations([]);
             setCurrentConversationId(null);
             return;
@@ -99,32 +90,41 @@ export function TreeProvider({ children }: { children: ReactNode }) {
 
     // Save to Supabase when state changes
     useEffect(() => {
-        if (!user || !currentConversationId) return;
+        if (!user || !state.rootId) return;
 
         const saveTimeout = setTimeout(async () => {
             const serialized = serializeState(state);
 
-            // Generate title from first user message if needed
-            let title: string | undefined;
+            // Generate title from root node's user message
             const rootNode = state.nodes.get(state.rootId);
-            if (rootNode && rootNode.children.length > 0) {
-                const firstChild = state.nodes.get(rootNode.children[0]);
-                if (firstChild?.userMessage) {
-                    title = firstChild.userMessage.slice(0, 50) + (firstChild.userMessage.length > 50 ? '...' : '');
+            const title = rootNode?.userMessage
+                ? rootNode.userMessage.slice(0, 50) + (rootNode.userMessage.length > 50 ? '...' : '')
+                : 'Untitled';
+
+            if (!currentConversationId) {
+                // INSERT new conversation
+                const { data } = await supabase
+                    .from('conversations')
+                    .insert({ user_id: user.id, tree_data: serialized, title })
+                    .select()
+                    .single();
+
+                if (data) {
+                    setCurrentConversationId(data.id);
+                    setConversations(prev => [{ id: data.id, title, updatedAt: data.updated_at }, ...prev]);
                 }
-            }
+            } else {
+                // UPDATE existing conversation
+                await supabase
+                    .from('conversations')
+                    .update({
+                        tree_data: serialized,
+                        updated_at: new Date().toISOString(),
+                        title
+                    })
+                    .eq('id', currentConversationId);
 
-            await supabase
-                .from('conversations')
-                .update({
-                    tree_data: serialized,
-                    updated_at: new Date().toISOString(),
-                    ...(title && { title })
-                })
-                .eq('id', currentConversationId);
-
-            // Update local conversations list
-            if (title) {
+                // Update local conversations list
                 setConversations(prev => prev.map(c =>
                     c.id === currentConversationId ? { ...c, title, updatedAt: new Date().toISOString() } : c
                 ));
@@ -134,24 +134,11 @@ export function TreeProvider({ children }: { children: ReactNode }) {
         return () => clearTimeout(saveTimeout);
     }, [state, user, currentConversationId]);
 
-    const createNewConversation = useCallback(async () => {
-        if (!user) return;
-
-        const newState = createInitialState();
-        const serialized = serializeState(newState);
-
-        const { data } = await supabase
-            .from('conversations')
-            .insert({ user_id: user.id, tree_data: serialized, title: 'New Conversation' })
-            .select()
-            .single();
-
-        if (data) {
-            setState(newState);
-            setCurrentConversationId(data.id);
-            setConversations(prev => [{ id: data.id, title: 'New Conversation', updatedAt: data.updated_at }, ...prev]);
-        }
-    }, [user]);
+    const createNewConversation = useCallback(() => {
+        // Just reset local state - DB save happens on first message
+        setState(createEmptyState());
+        setCurrentConversationId(null);
+    }, []);
 
     const switchConversation = useCallback(async (id: string) => {
         const { data } = await supabase
@@ -176,6 +163,20 @@ export function TreeProvider({ children }: { children: ReactNode }) {
         };
 
         setState(prev => {
+            // First node becomes the root
+            if (!prev.rootId) {
+                const rootNode: TreeNode = {
+                    ...newNode,
+                    parentId: null, // Root has no parent
+                };
+                return {
+                    nodes: new Map([[id, rootNode]]),
+                    rootId: id,
+                    selectedNodeId: id,
+                };
+            }
+
+            // Regular add node - add as child of parent
             const newNodes = new Map(prev.nodes);
             newNodes.set(id, newNode);
 
