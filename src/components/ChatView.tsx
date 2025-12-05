@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useTree } from '../TreeContext';
 import { AudioRecorder, type AudioRecorderRef } from './AudioRecorder';
+import { LineCommentable } from './LineCommentable';
 import { transcribe, summarize, reason } from '../gemini';
 
 interface ChatViewProps {
@@ -10,7 +11,7 @@ interface ChatViewProps {
 }
 
 export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
-    const { selectedNodeId, getPathToRoot, addNode, selectNode } = useTree();
+    const { selectedNodeId, getPathToRoot, addNode, selectNode, addLineComment, deleteLineComment } = useTree();
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [textInput, setTextInput] = useState('');
@@ -68,6 +69,16 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
             }
         }
     }, [selectedNodeId]);
+
+    // Scroll to bottom when "Thinking..." message appears
+    useEffect(() => {
+        if (isProcessing && messagesRef.current) {
+            messagesRef.current.scrollTo({
+                top: messagesRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    }, [isProcessing]);
 
     const activeNodeId = forkFromId || selectedNodeId;
     const path = getPathToRoot(activeNodeId);
@@ -171,7 +182,66 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
                                     )}
                                 </div>
                                 <div className="message-content">
-                                    <ReactMarkdown>{node.aiResponse}</ReactMarkdown>
+                                    <ReactMarkdown
+                                        components={{
+                                            p: ({ children, node: astNode }) => {
+                                                const offset = astNode?.position?.start?.offset ?? 0;
+                                                const existingComment = node.lineComments?.find(c => c.offset === offset);
+                                                return (
+                                                    <LineCommentable nodeId={node.id} offset={offset} comment={existingComment} onAddComment={addLineComment} onDeleteComment={deleteLineComment}>
+                                                        <p>{children}</p>
+                                                    </LineCommentable>
+                                                );
+                                            },
+                                            h1: ({ children, node: astNode }) => {
+                                                const offset = astNode?.position?.start?.offset ?? 0;
+                                                const existingComment = node.lineComments?.find(c => c.offset === offset);
+                                                return (
+                                                    <LineCommentable nodeId={node.id} offset={offset} comment={existingComment} onAddComment={addLineComment} onDeleteComment={deleteLineComment}>
+                                                        <h1>{children}</h1>
+                                                    </LineCommentable>
+                                                );
+                                            },
+                                            h2: ({ children, node: astNode }) => {
+                                                const offset = astNode?.position?.start?.offset ?? 0;
+                                                const existingComment = node.lineComments?.find(c => c.offset === offset);
+                                                return (
+                                                    <LineCommentable nodeId={node.id} offset={offset} comment={existingComment} onAddComment={addLineComment} onDeleteComment={deleteLineComment}>
+                                                        <h2>{children}</h2>
+                                                    </LineCommentable>
+                                                );
+                                            },
+                                            h3: ({ children, node: astNode }) => {
+                                                const offset = astNode?.position?.start?.offset ?? 0;
+                                                const existingComment = node.lineComments?.find(c => c.offset === offset);
+                                                return (
+                                                    <LineCommentable nodeId={node.id} offset={offset} comment={existingComment} onAddComment={addLineComment} onDeleteComment={deleteLineComment}>
+                                                        <h3>{children}</h3>
+                                                    </LineCommentable>
+                                                );
+                                            },
+                                            li: ({ children, node: astNode }) => {
+                                                const offset = astNode?.position?.start?.offset ?? 0;
+                                                const existingComment = node.lineComments?.find(c => c.offset === offset);
+                                                return (
+                                                    <LineCommentable nodeId={node.id} offset={offset} comment={existingComment} onAddComment={addLineComment} onDeleteComment={deleteLineComment}>
+                                                        <li>{children}</li>
+                                                    </LineCommentable>
+                                                );
+                                            },
+                                            blockquote: ({ children, node: astNode }) => {
+                                                const offset = astNode?.position?.start?.offset ?? 0;
+                                                const existingComment = node.lineComments?.find(c => c.offset === offset);
+                                                return (
+                                                    <LineCommentable nodeId={node.id} offset={offset} comment={existingComment} onAddComment={addLineComment} onDeleteComment={deleteLineComment}>
+                                                        <blockquote>{children}</blockquote>
+                                                    </LineCommentable>
+                                                );
+                                            },
+                                        }}
+                                    >
+                                        {node.aiResponse}
+                                    </ReactMarkdown>
                                 </div>
                             </div>
                         )}

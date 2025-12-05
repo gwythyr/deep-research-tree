@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import type { TreeNode, TreeState, Conversation } from './types';
+import type { TreeNode, TreeState, Conversation, LineComment } from './types';
 import { supabase } from './supabase';
 import { useAuth } from './AuthContext';
 
@@ -13,6 +13,8 @@ interface TreeContextType extends TreeState {
     getNode: (nodeId: string) => TreeNode | undefined;
     createNewConversation: () => void;
     switchConversation: (id: string) => void;
+    addLineComment: (nodeId: string, offset: number, comment: string) => void;
+    deleteLineComment: (nodeId: string, commentId: string) => void;
 }
 
 const TreeContext = createContext<TreeContextType | null>(null);
@@ -271,6 +273,44 @@ export function TreeProvider({ children }: { children: ReactNode }) {
         return state.nodes.get(nodeId);
     }, [state.nodes]);
 
+    const addLineComment = useCallback((nodeId: string, offset: number, comment: string) => {
+        const id = generateId();
+        const newComment: LineComment = {
+            id,
+            offset,
+            comment,
+            createdAt: Date.now(),
+        };
+
+        setState(prev => {
+            const node = prev.nodes.get(nodeId);
+            if (!node) return prev;
+
+            const newNodes = new Map(prev.nodes);
+            newNodes.set(nodeId, {
+                ...node,
+                lineComments: [...(node.lineComments || []), newComment],
+            });
+
+            return { ...prev, nodes: newNodes };
+        });
+    }, []);
+
+    const deleteLineComment = useCallback((nodeId: string, commentId: string) => {
+        setState(prev => {
+            const node = prev.nodes.get(nodeId);
+            if (!node || !node.lineComments) return prev;
+
+            const newNodes = new Map(prev.nodes);
+            newNodes.set(nodeId, {
+                ...node,
+                lineComments: node.lineComments.filter(c => c.id !== commentId),
+            });
+
+            return { ...prev, nodes: newNodes };
+        });
+    }, []);
+
     return (
         <TreeContext.Provider value={{
             ...state,
@@ -282,7 +322,9 @@ export function TreeProvider({ children }: { children: ReactNode }) {
             getPathToRoot,
             getNode,
             createNewConversation,
-            switchConversation
+            switchConversation,
+            addLineComment,
+            deleteLineComment
         }}>
             {children}
         </TreeContext.Provider>

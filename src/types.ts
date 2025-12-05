@@ -1,3 +1,10 @@
+export interface LineComment {
+  id: string;
+  offset: number;      // Character offset from start of aiResponse
+  comment: string;     // The comment content
+  createdAt: number;
+}
+
 export interface TreeNode {
   id: string;
   parentId: string | null;
@@ -10,6 +17,8 @@ export interface TreeNode {
   summary: string;
   children: string[];
   createdAt: number;
+  // Comments on specific lines of AI response
+  lineComments?: LineComment[];
 }
 
 export interface TreeState {
