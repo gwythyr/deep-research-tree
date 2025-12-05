@@ -31,10 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const signInWithGoogle = async () => {
+        // Get the base URL including pathname for GitHub Pages deployment
+        const baseUrl = window.location.origin + (import.meta.env.BASE_URL || '/');
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: window.location.origin,
+                redirectTo: baseUrl,
             },
         });
     };
