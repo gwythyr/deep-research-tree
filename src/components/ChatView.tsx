@@ -95,7 +95,7 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
                 audioBlob,
                 userMessage,
                 aiResponse: response,
-                summary: summary.slice(0, 30),
+                summary: summary.slice(0, 80),
             });
 
             if (forkFromId) {

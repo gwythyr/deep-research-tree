@@ -194,11 +194,44 @@ body {
 
 /* Tree Panel */
 .tree-panel {
-  width: 480px;
+  min-width: 300px;
+  max-width: 800px;
   border-right: 1px solid var(--border);
   background: var(--bg-secondary);
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* Resize Handle */
+.resize-handle {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 2px;
+  background: var(--border);
+  transition: background 0.15s ease;
+}
+
+.resize-handle:hover::after,
+.resize-handle.active::after {
+  background: var(--accent);
+}
+
+.resize-handle:hover,
+.resize-handle.active {
+  background: var(--accent-light);
 }
 
 .tree-panel h2 {
@@ -307,7 +340,7 @@ body {
   cursor: pointer;
   font-size: 0.875rem;
   transition: all 0.15s ease;
-  max-width: 420px;
+  max-width: calc(100% - 24px);
 }
 
 .tree-node:hover {
@@ -405,7 +438,8 @@ body {
 }
 
 .message {
-  max-width: 720px;
+  width: calc(100% - 24px);
+  max-width: 100%;
   padding: 16px 20px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
