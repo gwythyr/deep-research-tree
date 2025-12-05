@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useTree } from '../TreeContext';
-import { AudioRecorder } from './AudioRecorder';
+import { AudioRecorder, type AudioRecorderRef } from './AudioRecorder';
 import { transcribe, summarize, reason } from '../gemini';
 
 interface ChatViewProps {
@@ -15,6 +15,49 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
     const [error, setError] = useState<string | null>(null);
     const [textInput, setTextInput] = useState('');
     const messagesRef = useRef<HTMLDivElement>(null);
+    const audioRecorderRef = useRef<AudioRecorderRef>(null);
+    const isSpaceRecordingRef = useRef(false);
+
+    // Handle spacebar for recording
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if typing in an input/textarea
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // Start recording on spacebar press (check repeat to prevent multiple triggers)
+            if (e.code === 'Space' && !e.repeat && !isProcessing && !isSpaceRecordingRef.current) {
+                e.preventDefault();
+                isSpaceRecordingRef.current = true;
+                audioRecorderRef.current?.startRecording();
+            }
+        };
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            // Ignore if typing in an input/textarea
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // Stop recording on spacebar release
+            if (e.code === 'Space' && isSpaceRecordingRef.current) {
+                e.preventDefault();
+                isSpaceRecordingRef.current = false;
+                audioRecorderRef.current?.stopRecording();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [isProcessing]);
 
     // Scroll to the selected node's message when selectedNodeId changes
     useEffect(() => {
@@ -167,7 +210,7 @@ export function ChatView({ forkFromId, onClearFork }: ChatViewProps) {
                 <div className="input-divider">
                     <span>or</span>
                 </div>
-                <AudioRecorder onRecordingComplete={handleRecording} disabled={isProcessing} />
+                <AudioRecorder ref={audioRecorderRef} onRecordingComplete={handleRecording} disabled={isProcessing} />
             </div>
         </div>
     );
