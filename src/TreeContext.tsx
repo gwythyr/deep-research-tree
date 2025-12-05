@@ -7,6 +7,7 @@ interface TreeContextType extends TreeState {
     conversations: Conversation[];
     currentConversationId: string | null;
     addNode: (parentId: string, node: Omit<TreeNode, 'id' | 'children' | 'createdAt'>) => string;
+    deleteNode: (nodeId: string) => void;
     selectNode: (nodeId: string) => void;
     getPathToRoot: (nodeId: string) => TreeNode[];
     getNode: (nodeId: string) => TreeNode | undefined;
@@ -196,6 +197,54 @@ export function TreeProvider({ children }: { children: ReactNode }) {
         return id;
     }, []);
 
+    const deleteNode = useCallback((nodeId: string) => {
+        setState(prev => {
+            const nodeToDelete = prev.nodes.get(nodeId);
+            if (!nodeToDelete) return prev;
+
+            // Can't delete root node
+            if (nodeToDelete.parentId === null) return prev;
+
+            const newNodes = new Map(prev.nodes);
+
+            // Recursively collect all descendant IDs
+            const getAllDescendants = (id: string): string[] => {
+                const node = newNodes.get(id);
+                if (!node) return [];
+                const descendants = [...node.children];
+                node.children.forEach(childId => {
+                    descendants.push(...getAllDescendants(childId));
+                });
+                return descendants;
+            };
+
+            // Delete the node and all its descendants
+            const nodesToDelete = [nodeId, ...getAllDescendants(nodeId)];
+            nodesToDelete.forEach(id => newNodes.delete(id));
+
+            // Remove from parent's children array
+            const parent = newNodes.get(nodeToDelete.parentId);
+            if (parent) {
+                newNodes.set(nodeToDelete.parentId, {
+                    ...parent,
+                    children: parent.children.filter(id => id !== nodeId),
+                });
+            }
+
+            // If deleted node was selected, select parent
+            let newSelectedId = prev.selectedNodeId;
+            if (nodesToDelete.includes(prev.selectedNodeId)) {
+                newSelectedId = nodeToDelete.parentId;
+            }
+
+            return {
+                ...prev,
+                nodes: newNodes,
+                selectedNodeId: newSelectedId,
+            };
+        });
+    }, []);
+
     const selectNode = useCallback((nodeId: string) => {
         setState(prev => ({ ...prev, selectedNodeId: nodeId }));
     }, []);
@@ -227,6 +276,7 @@ export function TreeProvider({ children }: { children: ReactNode }) {
             conversations,
             currentConversationId,
             addNode,
+            deleteNode,
             selectNode,
             getPathToRoot,
             getNode,
